@@ -1,0 +1,173 @@
+
+class Program
+{
+    static string currentUser = null;
+    static async Task Main() => await Run();
+    static async Task Run()
+    {
+        while (true)
+        {
+            Console.Write("1. Вход\n2. Регистрация\n3. Выход\n> ");
+            switch (Console.ReadLine())
+            {
+                case "1": await Login(); break;
+                case "2": await Register(); break;
+                case "3": return;
+            }
+        }
+    }
+    static async Task Login()
+    {
+        Console.Write("Логин: ");
+        var login = Console.ReadLine();
+        Console.Write("Пароль: ");
+        var pass = Console.ReadLine();
+
+        foreach (var line in await File.ReadAllLinesAsync("users.txt"))
+        {
+            if (line == $"{login}:{pass}")
+            {
+                currentUser = login;
+                break;
+            }
+        }
+
+        if (currentUser != null)
+            await ManageTasks();
+        else
+            Console.WriteLine("Ошибка входа!");
+    }
+    static async Task Register()
+    {
+        Console.Write("Новый логин: ");
+        var login = Console.ReadLine();
+        Console.Write("Пароль: ");
+        var pass = Console.ReadLine();
+
+        await File.AppendAllTextAsync("users.txt", $"{login}:{pass}\n");
+        Console.WriteLine("Успешная регистрация!");
+    }
+
+    static async Task ManageTasks()
+    {
+        while (currentUser != null)
+        {
+            Console.Write("\n1. Новая задача \n2. Мои задачи \n3.Редактировать \n4. Удалить \n5. Выход \n ");
+            switch (Console.ReadLine())
+            {
+                case "1": await CreateTask(); break;
+                case "2": await ShowTasks(); break;
+                case "3": await EditTask(); break; 
+                case "4": await DeleteTask(); break;
+                case "5": currentUser = null; break;
+            }
+        }
+    }
+
+    static async Task CreateTask()
+    {
+        Console.Write("Заголовок: ");
+        var title = Console.ReadLine();
+        Console.Write("Описание: ");
+        var desc = Console.ReadLine();
+
+        Console.Write("Приоритет (1 - высокий, 2 - средний, 3 - низкий): ");
+        var priority = Console.ReadLine();
+
+        Console.Write("Статус (1 - недоступна,2 - в процессе,3 - завершена): ");
+        var status = Console.ReadLine();
+
+        await File.AppendAllTextAsync("tasks.txt", $"{currentUser}:{title}:{desc}:{priority}:{status}\n");
+        Console.WriteLine("Задача добавлена!");
+    }
+
+    static async Task ShowTasks()
+    {
+        var lines = await File.ReadAllLinesAsync("tasks.txt");
+
+        foreach (var line in lines)
+        {
+            if (line.StartsWith(currentUser))
+            {
+                var parts = line.Split(':');
+                if (parts.Length >= 5)
+                {
+                    string priority = "Низкий";
+                    if (parts[3] == "1") priority = "Высокий";
+                    else if (parts[3] == "2") priority = "Средний";
+
+                    string status = "Завершена";
+                    if (parts[4] == "1") status = "Недоступна";
+                    else if (parts[4] == "2") status = "В процессе";
+
+                    Console.WriteLine($"{parts[1]} - {parts[2]}   Приоритет: {priority}   Статус: {status}");
+                }
+            }
+        }
+    }
+
+
+    static async Task EditTask()
+    {
+        var list = new List<string>();
+        if (File.Exists("tasks.txt"))
+            list.AddRange(await File.ReadAllLinesAsync("tasks.txt"));
+
+        Console.Write("Номер задачи для редактирования: ");
+        if (int.TryParse(Console.ReadLine(), out int n))
+        {
+            var parts = list[n].Split(':');
+            if (parts.Length < 5)
+            {
+                Console.WriteLine("Некорректная задача.");
+                return;
+            }
+
+            Console.WriteLine($"Текущая задача: Заголовок: {parts[1]}, Описание: {parts[2]}, Приоритет: {parts[3]}, Статус: {parts[4]}");
+
+            Console.Write("Новый заголовок: ");
+            var newTitle = Console.ReadLine();
+            Console.Write("Новое описание: ");
+            var newDesc = Console.ReadLine();
+            Console.Write("Новый приоритет (1 - высокий, 2 - средний, 3 - низкий): ");
+            var newPriority = Console.ReadLine();
+            Console.Write("Новый статус (1 - недоступна, 2 - в процессе, 3 - завершена): ");
+            var newStatus = Console.ReadLine();
+
+            if (!string.IsNullOrWhiteSpace(newTitle))
+                parts[1] = newTitle;
+            if (!string.IsNullOrWhiteSpace(newDesc))
+                parts[2] = newDesc;
+            if (int.TryParse(newPriority, out var priorityIndex) && priorityIndex >= 1 && priorityIndex <= 3)
+                parts[3] = priorityIndex.ToString();
+            if (int.TryParse(newStatus, out var statusIndex) && statusIndex >= 1 && statusIndex <= 3)
+                parts[4] = statusIndex.ToString();
+
+            list[n] = string.Join(":", parts);
+            await File.WriteAllLinesAsync("tasks.txt", list);
+            Console.WriteLine("Задача обновлена!");
+        }
+        else
+        {
+            Console.WriteLine("Некорректный номер задачи.");
+        }
+    }
+
+    static async Task DeleteTask()
+    {
+        var list = File.Exists("tasks.txt") ? await File.ReadAllLinesAsync("tasks.txt") : Array.Empty<string>();
+
+        Console.Write("Номер задачи: ");
+        if (int.TryParse(Console.ReadLine(), out int n))
+        {
+            list = list.Where((_, index) => index != n).ToArray();
+            await File.WriteAllLinesAsync("tasks.txt", list);
+            Console.WriteLine("Задача удалена!");
+        }
+        else
+        {
+            Console.WriteLine("Некорректный номер задачи.");
+        }
+    }
+
+}
